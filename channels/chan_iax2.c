@@ -4073,7 +4073,7 @@ static int socket_read(int *id, int fd, short events, void *cbdata)
 		fr.callno = find_callno(ntohs(vh->callno) & ~0x8000, dcallno, &sin, new, 1);
 		minivid = 1;
 	} else if (meta->zeros == 0) {
-		/* This is a a meta header */
+		/* This is a meta header */
 		switch(meta->metacmd) {
 		case IAX_META_TRUNK:
 			if (res < sizeof(struct ast_iax2_meta_hdr) + sizeof(struct ast_iax2_meta_trunk_hdr)) {
@@ -4180,7 +4180,7 @@ static int socket_read(int *id, int fd, short events, void *cbdata)
 				|| (f.subclass == IAX_COMMAND_POKE)))
 			new = NEW_ALLOW;
 	} else {
-		/* Don't knwo anything about it yet */
+		/* Don't know anything about it yet */
 		f.frametype = AST_FRAME_NULL;
 		f.subclass = 0;
 	}
