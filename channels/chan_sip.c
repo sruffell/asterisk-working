@@ -4655,7 +4655,7 @@ static int sip_no_debug(int fd, int argc, char *argv[])
 static int reply_digest(struct sip_pvt *p, struct sip_request *req, char *header, char *respheader, char *digest, int digest_len);
 
 static int do_register_auth(struct sip_pvt *p, struct sip_request *req, char *header, char *respheader) {
-	char digest[256];
+	char digest[1024];
 	p->authtries++;
 	memset(digest,0,sizeof(digest));
 	if (reply_digest(p,req, header, "REGISTER", digest, sizeof(digest))) {
@@ -4666,7 +4666,7 @@ static int do_register_auth(struct sip_pvt *p, struct sip_request *req, char *he
 }
 
 static int do_proxy_auth(struct sip_pvt *p, struct sip_request *req, char *header, char *respheader, char *msg, int init) {
-	char digest[256];
+	char digest[1024];
 	p->authtries++;
 	memset(digest,0,sizeof(digest));
 	if (reply_digest(p,req, "Proxy-Authenticate", msg, digest, sizeof(digest) )) {
@@ -4678,7 +4678,7 @@ static int do_proxy_auth(struct sip_pvt *p, struct sip_request *req, char *heade
 
 static int reply_digest(struct sip_pvt *p, struct sip_request *req, char *header, char *orig_header, char *digest, int digest_len) {
 
-	char tmp[256] = "";
+	char tmp[512] = "";
 	char *realm = "";
 	char *nonce = "";
 	char *domain = "";
