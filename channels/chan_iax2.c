@@ -873,7 +873,7 @@ static int __do_deliver(void *data)
 				iax2_send(iaxs[fr->callno], &fr->af, fr->ts, -1, 0, 0, 0);
 			} else if (fr->af.subclass == IAX_COMMAND_LAGRP) {
 				/* This is a reply we've been given, actually measure the difference */
-				ts = calc_timestamp(iaxs[fr->callno], 0, NULL);
+				ts = calc_timestamp(iaxs[fr->callno], 0, &fr->af);
 				iaxs[fr->callno]->lag = ts - fr->ts;
 			}
 		} else {
@@ -4687,11 +4687,11 @@ retryowner2:
 					forward_command(iaxs[fr.callno], AST_FRAME_IAX, IAX_COMMAND_PONG, fr.ts, NULL, 0, -1);
 				} else {
 					/* Calculate ping time */
-					iaxs[fr.callno]->pingtime =  calc_timestamp(iaxs[fr.callno], 0, NULL) - fr.ts;
+					iaxs[fr.callno]->pingtime =  calc_timestamp(iaxs[fr.callno], 0, &f) - fr.ts;
 				}
 #else
 				/* Calculate ping time */
-				iaxs[fr.callno]->pingtime =  calc_timestamp(iaxs[fr.callno], 0) - fr.ts;
+				iaxs[fr.callno]->pingtime =  calc_timestamp(iaxs[fr.callno], 0, &f) - fr.ts;
 #endif
 				if (iaxs[fr.callno]->peerpoke) {
 					peer = iaxs[fr.callno]->peerpoke;
