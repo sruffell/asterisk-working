@@ -3795,7 +3795,11 @@ static int register_verify(struct sip_pvt *p, struct sockaddr_in *sin, struct si
 					sip_cancel_destroy(p);
 					if (parse_contact(p, peer, req)) {
 						ast_log(LOG_WARNING, "Failed to parse contact info\n");
-					} else {
+#ifdef MYSQL_FRIENDS
+		                if (peer->temponly)
+					mysql_update_peer(peer->name, &peer->addr, peer->username, p->expiry);
+#endif
+				} else {
 						/* Say OK and ask subsystem to retransmit msg counter */
 						transmit_response_with_date(p, "200 OK", req);
 						peer->lastmsgssent = -1;
@@ -3815,10 +3819,6 @@ static int register_verify(struct sip_pvt *p, struct sockaddr_in *sin, struct si
 			if (parse_contact(p, peer, req)) {
 				ast_log(LOG_WARNING, "Failed to parse contact info\n");
 			} else {
-#ifdef MYSQL_FRIENDS
-		if (peer->temponly)
-			mysql_update_peer(peer->name, &peer->addr, peer->username, p->expiry);
-#endif
 		/* Say OK and ask subsystem to retransmit msg counter */
 				transmit_response_with_date(p, "200 OK", req);
 				peer->lastmsgssent = -1;
