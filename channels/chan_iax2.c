@@ -301,6 +301,8 @@ struct chan_iax2_pvt {
 	unsigned int last;
 	/* Last sent timestamp - never send the same timestamp twice in a single call */
 	unsigned int lastsent;
+	/* Next outgoing timestamp if everything is good */
+	unsigned int nextpred;
 	/* Ping time */
 	unsigned int pingtime;
 	/* Max time for initial response */
@@ -488,7 +490,7 @@ static int send_command_immediate(struct chan_iax2_pvt *, char, int, unsigned in
 static int send_command_final(struct chan_iax2_pvt *, char, int, unsigned int, char *, int, int);
 static int send_command_transfer(struct chan_iax2_pvt *, char, int, unsigned int, char *, int);
 
-static unsigned int calc_timestamp(struct chan_iax2_pvt *p, unsigned int ts);
+static unsigned int calc_timestamp(struct chan_iax2_pvt *p, unsigned int ts, struct ast_frame *f);
 
 static int send_ping(void *data)
 {
@@ -871,7 +873,7 @@ static int __do_deliver(void *data)
 				iax2_send(iaxs[fr->callno], &fr->af, fr->ts, -1, 0, 0, 0);
 			} else if (fr->af.subclass == IAX_COMMAND_LAGRP) {
 				/* This is a reply we've been given, actually measure the difference */
-				ts = calc_timestamp(iaxs[fr->callno], 0);
+				ts = calc_timestamp(iaxs[fr->callno], 0, NULL);
 				iaxs[fr->callno]->lag = ts - fr->ts;
 			}
 		} else {
@@ -2326,6 +2328,59 @@ static unsigned int fix_peerts(struct iax2_peer *peer, int callno, unsigned int 
 	return ms + ts;
 }
 
+static unsigned int calc_timestamp(struct chan_iax2_pvt *p, unsigned int ts, struct ast_frame *f)
+{
+	struct timeval tv;
+	int ms;
+	int voice = 0;
+	int genuine = 0;
+	if (f) {
+		if (f->frametype == AST_FRAME_VOICE) {
+			voice = 1;
+		} else if (f->frametype == AST_FRAME_IAX) {
+			genuine = 1;
+		}
+	}
+	if (!p->offset.tv_sec && !p->offset.tv_usec) {
+		gettimeofday(&p->offset, NULL);
+		/* Round to nearest 20ms */
+		p->offset.tv_usec -= p->offset.tv_usec % 20000;
+	}
+	/* If the timestamp is specified, just send it as is */
+	if (ts)
+		return ts;
+	gettimeofday(&tv, NULL);
+	ms = (tv.tv_sec - p->offset.tv_sec) * 1000 + (tv.tv_usec - p->offset.tv_usec) / 1000;
+	if (ms < 0)
+		ms = 0;
+	if (voice) {
+		/* On a voice frame, use predicted values if appropriate */
+		if (abs(ms - p->nextpred) <= 640) {
+			if (!p->nextpred)
+				p->nextpred = f->samples / 8;
+			ms = p->nextpred;
+		} else
+			p->nextpred = ms;
+	} else {
+		/* On a dataframe, use last value + 3 (to accomodate jitter buffer shrinkign) if appropriate unless
+		   it's a genuine frame */
+		if (genuine) {
+			if (ms <= p->lastsent)
+				ms = p->lastsent + 3;
+		} else if (abs(ms - p->lastsent) <= 640) {
+			ms = p->lastsent + 3;
+		}
+	}
+	p->lastsent = ms;
+	if (voice)
+		p->nextpred = p->nextpred + f->samples / 8;
+#if 0
+	printf("TS: %s - %dms\n", voice ? "Audio" : "Control", ms);
+#endif	
+	return ms;
+}
+
+#if 0
 static unsigned int calc_timestamp(struct chan_iax2_pvt *p, unsigned int ts)
 {
 	struct timeval tv;
@@ -2343,6 +2398,7 @@ static unsigned int calc_timestamp(struct chan_iax2_pvt *p, unsigned int ts)
 	p->lastsent = ms;
 	return ms;
 }
+#endif
 
 #ifdef BRIDGE_OPTIMIZATION
 static unsigned int calc_fakestamp(struct chan_iax2_pvt *p1, struct chan_iax2_pvt *p2, unsigned int fakets)
@@ -2411,7 +2467,7 @@ static int iax2_send(struct chan_iax2_pvt *pvt, struct ast_frame *f, unsigned in
 	lastsent = pvt->lastsent;
 
 	/* Calculate actual timestamp */
-	fts = calc_timestamp(pvt, ts);
+	fts = calc_timestamp(pvt, ts, f);
 
 	if ((pvt->trunk || ((fts & 0xFFFF0000L) == (lastsent & 0xFFFF0000L)))
 		/* High two bits are the same on timestamp, or sending on a trunk */ &&
@@ -3419,6 +3475,7 @@ static int complete_transfer(int callno, struct iax_ies *ies)
 	pvt->svideoformat = -1;
 	pvt->videoformat = 0;
 	pvt->transfercallno = -1;
+	pvt->nextpred = 0;
 	memset(&pvt->rxcore, 0, sizeof(pvt->rxcore));
 	memset(&pvt->offset, 0, sizeof(pvt->offset));
 	memset(&pvt->history, 0, sizeof(pvt->history));
@@ -4630,7 +4687,7 @@ retryowner2:
 					forward_command(iaxs[fr.callno], AST_FRAME_IAX, IAX_COMMAND_PONG, fr.ts, NULL, 0, -1);
 				} else {
 					/* Calculate ping time */
-					iaxs[fr.callno]->pingtime =  calc_timestamp(iaxs[fr.callno], 0) - fr.ts;
+					iaxs[fr.callno]->pingtime =  calc_timestamp(iaxs[fr.callno], 0, NULL) - fr.ts;
 				}
 #else
 				/* Calculate ping time */
