@@ -1257,6 +1257,7 @@ static int run_agi(struct ast_channel *chan, char *request, AGI *agi, int pid)
 	if (!(readf = fdopen(agi->ctrl, "r"))) {
 		ast_log(LOG_WARNING, "Unable to fdopen file descriptor\n");
 		kill(pid, SIGHUP);
+		close(agi->ctrl);
 		return -1;
 	}
 	setlinebuf(readf);
@@ -1439,7 +1440,8 @@ static int agi_exec_full(struct ast_channel *chan, void *data, int enhanced)
 		agi.ctrl = fds[0];
 		agi.audio = efd;
 		res = run_agi(chan, tmp, &agi, pid);
-		close(fds[0]);
+		/* close of fds[0] handled by run_agi function. */
+		/*close(fds[0]); */ 
 		close(fds[1]);
 		if (efd > -1)
 			close(efd);
