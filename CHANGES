@@ -1,3 +1,7 @@
+Asterisk 0.9.0
+ -- Fixes from the bug tracker
+ -- ADPCM Standardization
+ -- Branch to Stable CVS
 Asterisk 0.7.2
  -- Countless small bug fixes from bug tracker
  -- DSP Fixes
