@@ -1551,10 +1551,10 @@ int main(int argc, char *argv[])
 struct hostent *ast_gethostbyname(const char *host, struct ast_hostent *hp)
 {
 	int res;
-	int h_errno;
+	int herrno;
 	struct hostent *result = NULL;
 	/* XXX Does BSD do this differently? XXX */
-	res = gethostbyname_r(host, &hp->hp, hp->buf, sizeof(hp->buf), &result, &h_errno);
+	res = gethostbyname_r(host, &hp->hp, hp->buf, sizeof(hp->buf), &result, &herrno);
 	if (res)
 		return NULL;
 	return &hp->hp;

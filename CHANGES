@@ -1,4 +1,5 @@
 Asterisk 0.9.0
+ -- Logging fixes
  -- Fixes from the bug tracker
  -- ADPCM Standardization
  -- Branch to Stable CVS
