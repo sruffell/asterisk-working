@@ -700,7 +700,7 @@ static void mysql_update_peer(char *peer, struct sockaddr_in *sin, char *usernam
 		mysql_real_escape_string(mysql, name, peer, strlen(peer));
 		mysql_real_escape_string(mysql, uname, username, strlen(username));
 		snprintf(query, sizeof(query), "UPDATE sipfriends SET ipaddr=\"%s\", port=\"%d\", regseconds=\"%ld\", username=\"%s\" WHERE name=\"%s\"", 
-			inet_ntoa(sin->sin_addr), ntohs(sin->sin_port), nowtime, uname + expiry, name);
+			inet_ntoa(sin->sin_addr), ntohs(sin->sin_port), nowtime + expiry, uname, name);
 		ast_mutex_lock(&mysqllock);
 		if (mysql_real_query(mysql, query, strlen(query))) 
 			ast_log(LOG_WARNING, "Unable to update database\n");
@@ -3795,11 +3795,11 @@ static int register_verify(struct sip_pvt *p, struct sockaddr_in *sin, struct si
 					sip_cancel_destroy(p);
 					if (parse_contact(p, peer, req)) {
 						ast_log(LOG_WARNING, "Failed to parse contact info\n");
+					} else {
 #ifdef MYSQL_FRIENDS
 		                if (peer->temponly)
 					mysql_update_peer(peer->name, &peer->addr, peer->username, p->expiry);
 #endif
-				} else {
 						/* Say OK and ask subsystem to retransmit msg counter */
 						transmit_response_with_date(p, "200 OK", req);
 						peer->lastmsgssent = -1;
