@@ -303,6 +303,7 @@ struct mgcp_endpoint {
 static struct mgcp_gateway {
 	/* A gateway containing one or more endpoints */
 	char name[80];
+    int isnamedottedip; /* SC: is the name dotted ip */
 	struct sockaddr_in addr;
 	struct sockaddr_in defaddr;
 	struct in_addr ourip;
@@ -1364,7 +1365,11 @@ static int init_req(struct mgcp_endpoint *p, struct mgcp_request *req, char *ver
 		return -1;
 	}
 	req->header[req->headers] = req->data + req->len;
-	snprintf(req->header[req->headers], sizeof(req->data) - req->len, "%s %d %s@%s MGCP 1.0\r\n", verb, oseq, p->name, p->parent->name);
+    /* SC: check if we need brackets around the gw name */
+    if (p->parent->isnamedottedip)
+        snprintf(req->header[req->headers], sizeof(req->data) - req->len, "%s %d %s@[%s] MGCP 1.0\r\n", verb, oseq, p->name, p->parent->name);
+    else
+        snprintf(req->header[req->headers], sizeof(req->data) - req->len, "%s %d %s@%s MGCP 1.0\r\n", verb, oseq, p->name, p->parent->name);
 	req->len += strlen(req->header[req->headers]);
 	if (req->headers < MGCP_MAX_HEADERS)
 		req->headers++;
@@ -2647,6 +2652,9 @@ static struct mgcp_gateway *build_gateway(char *cat, struct ast_variable *v)
 		memset(gw, 0, sizeof(struct mgcp_gateway));
 		gw->expire = -1;
 		strncpy(gw->name, cat, sizeof(gw->name) - 1);
+        /* SC: check if the name is numeric ip */
+        if (inet_addr(gw->name) != INADDR_NONE)
+            gw->isnamedottedip = 1;
 		while(v) {
 			if (!strcasecmp(v->name, "host")) {
 				if (!strcasecmp(v->value, "dynamic")) {
