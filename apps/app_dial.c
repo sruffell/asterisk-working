@@ -67,6 +67,7 @@ static char *descrip =
 "      'P[(x)]' -- privacy mode, using 'x' as database if provided.\n"
 "      'g' -- goes on in context if the destination channel hangs up\n"
 "      'A(x)' -- play an announcement to the called party, using x as file\n"
+"      'S(x)' -- hangup the call after x seconds AFTER called party picked up\n"  	
 "  In addition to transferring the call, a call may be parked and then picked\n"
 "up by another user.\n"
 "  The optional URL will be sent to the called party if the channel supports\n"
@@ -138,8 +139,8 @@ static struct ast_channel *wait_for_answer(struct ast_channel *in, struct localu
 			ast_moh_start(in, NULL);
 		} else if (outgoing->ringbackonly) {
 			ast_indicate(in, AST_CONTROL_RINGING);
-		}
 			sentringing++;
+		}
 	}
 	
 	while(*to && !peer) {
@@ -222,6 +223,12 @@ static struct ast_channel *wait_for_answer(struct ast_channel *in, struct localu
 							else
 								ast_log(LOG_WARNING, "Out of memory\n");
 						}
+						if (o->chan->rdnis) 
+							free(o->chan->rdnis);
+						if (strlen(in->macroexten))
+							o->chan->rdnis = strdup(in->macroexten);
+						else
+							o->chan->rdnis = strdup(in->exten);
 						if (ast_call(o->chan, tmpchan, 0)) {
 							ast_log(LOG_NOTICE, "Failed to dial on local channel for call forward to '%s'\n", tmpchan);
 							o->stillgoing = 0;
@@ -380,9 +387,12 @@ static int dial_exec(struct ast_channel *chan, void *data)
 	struct varshead *headp, *newheadp;
 	struct ast_var_t *newvar;
 	int go_on=0;
+	unsigned int calldurationlimit=0;
+	char *cdl;
+	time_t now;
 	
 	if (!data) {
-		ast_log(LOG_WARNING, "Dial requires an argument (technology1/number1&technology2/number2...|optional timeout)\n");
+		ast_log(LOG_WARNING, "Dial requires an argument (technology1/number1&technology2/number2...|optional timeout|options)\n");
 		return -1;
 	}
 	
@@ -391,6 +401,7 @@ static int dial_exec(struct ast_channel *chan, void *data)
 	strncpy(info, (char *)data, sizeof(info) - 1);
 	peers = info;
 	if (peers) {
+		
 		timeout = strchr(info, '|');
 		if (timeout) {
 			*timeout = '\0';
@@ -419,6 +430,13 @@ static int dial_exec(struct ast_channel *chan, void *data)
 	
 
 	if (transfer) {
+		/* Extract call duration limit */
+		if ((cdl = strstr(transfer, "S("))) {
+			calldurationlimit=atoi(cdl+2);
+			if (option_verbose > 2)
+				ast_verbose(VERBOSE_PREFIX_3 "Setting call duration limit to %i seconds.\n",calldurationlimit);			
+		} 
+		
 		/* XXX ANNOUNCE SUPPORT */
 		if ((ann = strstr(transfer, "A("))) {
 			announce = 1;
@@ -650,9 +668,13 @@ static int dial_exec(struct ast_channel *chan, void *data)
 		cur = rest;
 	} while(cur);
 	
-	if (timeout && strlen(timeout))
-		to = atoi(timeout) * 1000;
-	else
+	if (timeout && strlen(timeout)) {
+		to = atoi(timeout);
+		if (to > 0)
+			to *= 1000;
+		else
+			ast_log(LOG_WARNING, "Invalid timeout specified: '%s'\n", timeout);
+	} else
 		to = -1;
 	peer = wait_for_answer(chan, outgoing, &to, &allowredir_in, &allowredir_out, &allowdisconnect);
 	if (!peer) {
@@ -702,6 +724,10 @@ static int dial_exec(struct ast_channel *chan, void *data)
 				res2 = ast_waitstream(peer,"");
 			// Ok, done. stop autoservice
 			res2 = ast_autoservice_stop(chan);
+		}
+		if (calldurationlimit > 0) {
+			time(&now);
+			chan->whentohangup = now + calldurationlimit;
 		}
 		res = ast_bridge_call(chan, peer, allowredir_in, allowredir_out, allowdisconnect);
 
