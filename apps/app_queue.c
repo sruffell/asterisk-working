@@ -1471,7 +1471,7 @@ static int manager_queues_status( struct mansession *s, struct message *m )
 	time(&now);
 	ast_mutex_lock(&qlock);
 	q = queues;
-	if (id && &id) {
+	if (id && strlen(id)) {
 		snprintf(idText,256,"ActionID: %s\r\n",id);
 	}
 	while(q) {
