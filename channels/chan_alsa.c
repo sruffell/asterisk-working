@@ -320,7 +320,7 @@ static void *sound_thread(void *unused)
 static snd_pcm_t *alsa_card_init(char *dev, snd_pcm_stream_t stream)
 {
 	int err;
-	int direction
+	int direction;
 	snd_pcm_t *handle = NULL;
 	snd_pcm_hw_params_t *hwparams = NULL;
 	snd_pcm_sw_params_t *swparams = NULL;
