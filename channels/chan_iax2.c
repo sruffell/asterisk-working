@@ -2122,6 +2122,8 @@ static int iax2_bridge(struct ast_channel *c0, struct ast_channel *c1, int flags
 						/* Take out of conference mode */
 						res = 0;
 						/* Remove from native mode */
+	if (strlen(c->context))
+		strncpy(iaxs[callno]->context, c->context, sizeof(iaxs[callno]->context));
 						break;
 					} else 
 						goto tackygoto;
