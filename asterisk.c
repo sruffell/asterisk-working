@@ -1679,7 +1679,7 @@ struct hostent *ast_gethostbyname(const char *host, struct ast_hostent *hp)
 
 	res = gethostbyname_r(host, &hp->hp, hp->buf, sizeof(hp->buf), &result, &herrno);
 
-	if (res || !hp->hp.h_addr_list || !hp->hp.h_addr_list[0])
+	if (res || !result || !hp->hp.h_addr_list || !hp->hp.h_addr_list[0])
 		return NULL;
 	return &hp->hp;
 }
