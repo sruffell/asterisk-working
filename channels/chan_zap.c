@@ -5864,6 +5864,11 @@ static int pri_fixup(struct zt_pri *pri, int channel, q931_call *c)
 			return 0;
 		return channel;
 	}
+	if ((channel >= 1) && 
+		(channel <= pri->channels) && 
+		(pri->pvt[channel]) && 
+		(pri->pvt[channel]->call == c))
+		return channel;
 	for (x=1;x<=pri->channels;x++) {
 		if (!pri->pvt[x]) continue;
 		if (pri->pvt[x]->call == c) {
