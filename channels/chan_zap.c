@@ -7220,7 +7220,8 @@ static int __unload_module(void)
 #ifdef ZAPATA_PRI
 	int i;
 	for(i=0;i<NUM_SPANS;i++) {
-		pthread_cancel(pris[i].master);
+		if (pris[i].master != AST_PTHREADT_NULL) 
+			pthread_cancel(pris[i].master);
 	}
 	ast_cli_unregister(&pri_debug);
 	ast_cli_unregister(&pri_no_debug);
@@ -7694,6 +7695,7 @@ int load_module(void)
 	for (y=0;y<NUM_SPANS;y++) {
 		pris[y].offset = -1;
 		pris[y].fd = -1;
+		pris[y].master = AST_PTHREADT_NULL;
 	}
 	pri_set_error(zt_pri_error);
 	pri_set_message(zt_pri_message);
