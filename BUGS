@@ -9,8 +9,10 @@ diversion of the feature set between stable (1.0) and developmental
 Asterisk.  This section is a list of important differences between the
 stable (1.0) and development versions of Asterisk.
 
-* The number of SIP channels that can be simultaneously run through Asterisk
-  may be more limited than in development releases.
+* The number of channels that can be simultaneously run through Asterisk
+  may be more limited than in development releases due to the use of 
+  select vs. poll.  High density applications should not be running 1.0
+  branch releases.
 
 * When Asterisk carries media from one RTP or IAX connection to another, 
   jitter on one side can sometimes be reflected in the timestamps going
