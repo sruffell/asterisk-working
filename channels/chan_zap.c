@@ -3002,7 +3002,6 @@ static struct ast_frame *zt_handle_event(struct ast_channel *ast)
 						if (res < 0) {
 						  ast_log(LOG_WARNING, "Unable to initiate dialing on trunk channel %d\n", p->channel);
 						  p->dop.dialstr[0] = '\0';
-						  return NULL;
 						} else {
 						  ast_log(LOG_DEBUG, "Sent FXO deferred digit string: %s\n", p->dop.dialstr);
 						  p->subs[index].f.frametype = AST_FRAME_NULL;
