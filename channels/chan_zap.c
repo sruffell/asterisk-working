@@ -7360,7 +7360,8 @@ static int setup_zap(void)
 				chan = strsep(&c, ",");
 			}
 		} else if (!strcasecmp(v->name, "usedistinctiveringdetection")) {
-			usedistinctiveringdetection = ast_true(v->value);
+			if (ast_true(v->value))
+				usedistinctiveringdetection = 1;
 		} else if (!strcasecmp(v->name, "dring1context")) {
 			strncpy(drings.ringContext[0].contextData,v->value,sizeof(drings.ringContext[0].contextData)-1);
 		} else if (!strcasecmp(v->name, "dring2context")) {
@@ -7843,7 +7844,8 @@ static int reload_zt(void)
 				chan = strsep(&stringp, ",");
 			}
 		} else if (!strcasecmp(v->name, "usedistinctiveringdetection")) {
-			usedistinctiveringdetection = ast_true(v->value);
+			if (ast_true(v->value))
+				usedistinctiveringdetection = 1;
 		} else if (!strcasecmp(v->name, "dring1context")) {
 			strncpy(drings.ringContext[0].contextData,v->value,sizeof(drings.ringContext[0].contextData)-1);
 		} else if (!strcasecmp(v->name, "dring2context")) {
