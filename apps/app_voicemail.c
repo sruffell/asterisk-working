@@ -3045,6 +3045,7 @@ static int append_mailbox(char *context, char *mbox, char *data)
 	return 0;
 }
 
+#ifndef USEMYSQLVM
 /* XXX TL Bug 690 */
 static char show_voicemail_users_help[] =
 "Usage: show voicemail users [for <context>]\n"
@@ -3166,7 +3167,7 @@ static struct ast_cli_entry show_voicemail_zones_cli =
 	{ { "show", "voicemail", "zones", NULL },
 	handle_show_voicemail_zones, "List zone message formats",
 	show_voicemail_zones_help, NULL };
-
+#endif
 
 static int load_config(void)
 {
@@ -3410,8 +3411,10 @@ int unload_module(void)
 	res |= ast_unregister_application(app2);
 	res |= ast_unregister_application(capp2);
 	sql_close();
+#ifndef USEMYSQLVM
 	ast_cli_unregister(&show_voicemail_users_cli);
 	ast_cli_unregister(&show_voicemail_zones_cli);
+#endif
 	return res;
 }
 
@@ -3433,8 +3436,10 @@ int load_module(void)
 		ast_log(LOG_WARNING, "SQL init\n");
 		return res;
 	}
+#ifndef USEMYSQLVM
 	ast_cli_register(&show_voicemail_users_cli);
 	ast_cli_register(&show_voicemail_zones_cli);
+#endif
 	return res;
 }
 
