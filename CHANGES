@@ -1,5 +1,6 @@
+ -- Use reentrant version of gethostbyname
 Asterisk 0.9.0
- -- Logging fixes
+ -- Logging fixes (fixes remote DoS)
  -- Fixes from the bug tracker
  -- ADPCM Standardization
  -- Branch to Stable CVS
