@@ -1417,6 +1417,7 @@ static int leave_voicemail(struct ast_channel *chan, char *ext, int silent, int 
 			if (strlen(chan->macrocontext))
 				strncpy(chan->context, chan->macrocontext, sizeof(chan->context) - 1);
 			chan->priority = 0;
+			ast_stopstream(chan);
 			free_user(vmu);
 			return 0;
 		}
