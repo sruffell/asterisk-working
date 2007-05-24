@@ -48,6 +48,10 @@ ASTERISK_FILE_VERSION(__FILE__, "$Revision$")
 #include <sys/signal.h>
 #include <iksemel.h>
 
+#include <gcrypt.h>
+#include <pthread.h>
+GCRY_THREAD_OPTION_PTHREAD_IMPL;
+
 #include "asterisk/lock.h"
 #include "asterisk/channel.h"
 #include "asterisk/config.h"
@@ -527,7 +531,7 @@ static enum ast_rtp_get_result gtalk_get_rtp_peer(struct ast_channel *chan, stru
 	ast_mutex_lock(&p->lock);
 	if (p->rtp){
 		*rtp = p->rtp;
-		res = AST_RTP_TRY_NATIVE;
+		res = AST_RTP_TRY_PARTIAL;
 	}
 	ast_mutex_unlock(&p->lock);
 
@@ -1136,6 +1140,7 @@ static int gtalk_update_stun(struct gtalk *client, struct gtalk_pvt *p)
 	struct hostent *hp;
 	struct ast_hostent ahp;
 	struct sockaddr_in sin;
+	struct sockaddr_in aux;
 
 	if (time(NULL) == p->laststun)
 		return 0;
@@ -1144,14 +1149,32 @@ static int gtalk_update_stun(struct gtalk *client, struct gtalk_pvt *p)
 	p->laststun = time(NULL);
 	while (tmp) {
 		char username[256];
+
+		/* Find the IP address of the host */
 		hp = ast_gethostbyname(tmp->ip, &ahp);
 		sin.sin_family = AF_INET;
 		memcpy(&sin.sin_addr, hp->h_addr, sizeof(sin.sin_addr));
 		sin.sin_port = htons(tmp->port);
 		snprintf(username, sizeof(username), "%s%s", tmp->username,
-				 p->ourcandidates->username);
+			 p->ourcandidates->username);
+		
+		/* Find out the result of the STUN */
+		ast_rtp_get_peer(p->rtp, &aux);
 
-		ast_rtp_stun_request(p->rtp, &sin, username);
+		/* If the STUN result is different from the IP of the hostname,
+			lock on the stun IP of the hostname advertised by the
+			remote client */
+		if (aux.sin_addr.s_addr && 
+		    aux.sin_addr.s_addr != sin.sin_addr.s_addr)
+			ast_rtp_stun_request(p->rtp, &aux, username);
+		else 
+			ast_rtp_stun_request(p->rtp, &sin, username);
+		
+		if (aux.sin_addr.s_addr && option_debug > 3) {
+			ast_log(LOG_DEBUG, "Receiving RTP traffic from IP %s, matches with remote candidate's IP %s\n", ast_inet_ntoa(aux.sin_addr), tmp->ip);
+			ast_log(LOG_DEBUG, "Sending STUN request to %s\n", tmp->ip);
+		}
+
 		tmp = tmp->next;
 	}
 	return 1;
@@ -1797,6 +1820,8 @@ static int gtalk_load_config(void)
 /*! \brief Load module into PBX, register channel */
 static int load_module(void)
 {
+        gcry_control (GCRYCTL_SET_THREAD_CBS, &gcry_threads_pthread);
+
 	ASTOBJ_CONTAINER_INIT(&gtalk_list);
 	if (!gtalk_load_config()) {
 		ast_log(LOG_ERROR, "Unable to read config file %s. Not loading module.\n", GOOGLE_CONFIG);
