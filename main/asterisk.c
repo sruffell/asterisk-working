@@ -101,6 +101,7 @@ int daemon(int, int);  /* defined in libresolv of all places */
 #endif
 
 #ifdef linux
+#include <sys/mman.h>
 #include <sys/prctl.h>
 #ifdef HAVE_CAP
 #include <sys/capability.h>
@@ -1581,9 +1582,12 @@ int ast_set_priority(int pri)
 		if (sched_setscheduler(0, SCHED_RR, &sched)) {
 			ast_log(LOG_WARNING, "Unable to set high priority\n");
 			return -1;
-		} else
-			if (option_verbose)
+		} else {
+			mlockall(MCL_FUTURE);
+			if (option_verbose) {
 				ast_verbose("Set to realtime thread\n");
+			}
+		}
 	} else {
 		sched.sched_priority = 0;
 		/* According to the manpage, these parameters can never fail. */
