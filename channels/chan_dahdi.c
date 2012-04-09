@@ -792,6 +792,8 @@ struct dahdi_pvt {
 	unsigned int digital:1;
 	/*! \brief TRUE if Do-Not-Disturb is enabled, present only for non sig_analog */
 	unsigned int dnd:1;
+	/*! \brief TRUE if an analog line is forced off-hook in order to seize line. */
+	unsigned int busyout:1;
 	/*! \brief XXX BOOLEAN Purpose??? */
 	unsigned int echobreak:1;
 	/*!
@@ -5335,7 +5337,14 @@ static int dahdi_call(struct ast_channel *ast, char *rdest, int timeout)
 	char dest[256]; /* must be same length as p->dialdest */
 
 	ast_mutex_lock(&p->lock);
+
+	if (p->busyout) {
+		ast_mutex_unlock(&p->lock);
+		return -1;
+	}
+
 	ast_copy_string(dest, rdest, sizeof(dest));
+
 	ast_copy_string(p->dialdest, rdest, sizeof(p->dialdest));
 	if ((ast->_state == AST_STATE_BUSY)) {
 		p->subs[SUB_REAL].needbusy = 1;
@@ -9817,6 +9826,45 @@ static int dahdi_dnd(struct dahdi_pvt *dahdichan, int flag)
 	return 0;
 }
 
+/*! \brief enable or disable the chan_dahdi BUSYOUT mode for a DAHDI channel
+ * \param dahdichan "Physical" DAHDI channel (e.g: DAHDI/5)
+ * \param flag on 1 to enable, 0 to disable, -1 return BUSYOUT value
+ *
+ * When a BUSYOUT is enabled on the channel, the line will be seized. For FXO ports this
+ * means that the channel will be forced into the off-hook state so that the CO believes
+ * that the line is currently busy and not route calls to this server.
+ *
+ */
+static int dahdi_busyout(struct dahdi_pvt *dahdichan, int flag)
+{
+	int hookstate;
+	int res;
+
+	if (-1 == flag) {
+		return dahdichan->busyout;
+	}
+
+	hookstate = (flag) ?  DAHDI_OFFHOOK : DAHDI_ONHOOK;
+	res = dahdi_set_hook(dahdichan->subs[SUB_REAL].dfd, hookstate);
+	if (res) {
+		ast_log(LOG_ERROR, "Failed to change BUSYOUT on channel DAHDI\%d.\n",
+				dahdichan->channel);
+		return -1;
+	}
+
+	
+	dahdichan->busyout = flag;
+	ast_verb(3, "%s BUSYOUT on channel %d\n",
+			flag ? "Enabled" : "Disabled",
+			dahdichan->channel);
+	manager_event(EVENT_FLAG_SYSTEM, "BUSYOUTState",
+			"Channel: DAHDI/%d\r\n"
+			"Status: %s\r\n", dahdichan->channel,
+			flag ? "enabled" : "disabled");
+
+	return 0;
+}
+
 static int canmatch_featurecode(const char *exten)
 {
 	int extlen = strlen(exten);
@@ -13586,6 +13634,10 @@ static struct ast_channel *dahdi_request(const char *type, format_t format, cons
 
 		if (is_group_or_channel_match(p, start.span, start.groupmatch, &groupmatched, start.channelmatch, &channelmatched)
 			&& available(&p, channelmatched)) {
+			if (p->busyout) {
+				ast_log(LOG_WARNING, "Channel %d in BUSYOUT state.\n", p->channel);
+				goto next;
+			}
 			ast_debug(1, "Using channel %d\n", p->channel);
 
 			callwait = (p->owner != NULL);
@@ -13683,9 +13735,7 @@ static struct ast_channel *dahdi_request(const char *type, format_t format, cons
 			}
 			break;
 		}
-#ifdef HAVE_OPENR2
 next:
-#endif
 		if (start.backwards) {
 			p = p->prev;
 			if (!p)
@@ -15305,7 +15355,6 @@ static char *dahdi_show_channel(struct ast_cli_entry *e, int cmd, struct ast_cli
 			ast_cli(a->fd, "Dynamic Range Compression (RX/TX): %.2f/%.2f\n", tmp->rxdrc, tmp->txdrc);
 			ast_cli(a->fd, "DND: %s\n", dahdi_dnd(tmp, -1) ? "yes" : "no");
 			ast_cli(a->fd, "Echo Cancellation:\n");
-
 			if (tmp->echocancel.head.tap_length) {
 				ast_cli(a->fd, "\t%d taps\n", tmp->echocancel.head.tap_length);
 				for (x = 0; x < tmp->echocancel.head.param_count; x++) {
@@ -15315,6 +15364,7 @@ static char *dahdi_show_channel(struct ast_cli_entry *e, int cmd, struct ast_cli
 			} else {
 				ast_cli(a->fd, "\tnone\n");
 			}
+			ast_cli(a->fd, "Busyout: %s\n", dahdi_busyout(tmp, -1) ? "yes" : "no");
 			ast_cli(a->fd, "Wait for dialtone: %dms\n", tmp->waitfordialtone);
 			if (tmp->master)
 				ast_cli(a->fd, "Master Channel: %d\n", tmp->master->channel);
@@ -15756,6 +15806,63 @@ static char *dahdi_set_dnd(struct ast_cli_entry *e, int cmd, struct ast_cli_args
 	return CLI_SUCCESS;
 }
 
+static char *dahdi_set_busyout(struct ast_cli_entry *e, int cmd, struct ast_cli_args *a)
+{
+	int channel;
+	int on;
+	struct dahdi_pvt *dahdi_chan = NULL;
+
+	switch (cmd) {
+	case CLI_INIT:
+		e->command = "dahdi set busyout";
+		e->usage =
+			"Usage: dahdi set busyout <chan#> <on|off>\n"
+			"	Sets/resets BUSYOUT mode on a channel.\n"
+			"	Changes take effect immediately.\n"
+			"	<chan num> is the channel number\n"
+			" 	<on|off> Enable or disable BUSYOUT mode?\n"
+			;
+		return NULL;
+	case CLI_GENERATE:
+		return NULL;
+	}
+
+	if (a->argc != 5)
+		return CLI_SHOWUSAGE;
+
+	if ((channel = atoi(a->argv[3])) <= 0) {
+		ast_cli(a->fd, "Expected channel number, got '%s'\n", a->argv[3]);
+		return CLI_SHOWUSAGE;
+	}
+
+	if (ast_true(a->argv[4]))
+		on = 1;
+	else if (ast_false(a->argv[4]))
+		on = 0;
+	else {
+		ast_cli(a->fd, "Expected 'on' or 'off', got '%s'\n", a->argv[4]);
+		return CLI_SHOWUSAGE;
+	}
+
+	ast_mutex_lock(&iflock);
+	for (dahdi_chan = iflist; dahdi_chan; dahdi_chan = dahdi_chan->next) {
+		if (dahdi_chan->channel != channel)
+			continue;
+
+		/* Found the channel. Actually set it */
+		dahdi_busyout(dahdi_chan, on);
+		break;
+	}
+	ast_mutex_unlock(&iflock);
+
+	if (!dahdi_chan) {
+		ast_cli(a->fd, "Unable to find given channel %d\n", channel);
+		return CLI_FAILURE;
+	}
+
+	return CLI_SUCCESS;
+}
+
 static struct ast_cli_entry dahdi_cli[] = {
 	AST_CLI_DEFINE(handle_dahdi_show_cadences, "List cadences"),
 	AST_CLI_DEFINE(dahdi_show_channels, "Show active DAHDI channels"),
@@ -15767,6 +15874,7 @@ static struct ast_cli_entry dahdi_cli[] = {
 	AST_CLI_DEFINE(dahdi_set_hwgain, "Set hardware gain on a channel"),
 	AST_CLI_DEFINE(dahdi_set_swgain, "Set software gain on a channel"),
 	AST_CLI_DEFINE(dahdi_set_dnd, "Sets/resets DND (Do Not Disturb) mode on a channel"),
+	AST_CLI_DEFINE(dahdi_set_busyout, "Sets/resets BUSYOUT mode on a channel"),
 };
 
 #define TRANSFER	0
