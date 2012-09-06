@@ -76,8 +76,8 @@ pjproject/build.mak:
 .PHONY : pjproject
 pjproject: pjproject/build.mak
 	# Make sure we always build pjproject with a single job.
-	$(MAKE) -j1 -C pjproject dep
-	$(MAKE) -j1 -C pjproject
+	$(MAKE) -C pjproject dep
+	$(MAKE) -C pjproject
 
 include pjproject/build.mak
 
