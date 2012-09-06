@@ -700,14 +700,15 @@ static pj_status_t ast_rtp_on_ice_tx_pkt(pj_ice_sess *ice, unsigned comp_id, uns
 {
 	struct ast_rtp *rtp = ice->user_data;
 	pj_status_t status = PJ_EINVALIDOP;
+	pj_ssize_t _size = (pj_ssize_t)size;
 
 	if (transport_id == TRANSPORT_SOCKET_RTP) {
 		/* Traffic is destined to go right out the RTP socket we already have */
-		status = pj_sock_sendto(rtp->s, pkt, (pj_ssize_t*)&size, 0, dst_addr, dst_addr_len);
+		status = pj_sock_sendto(rtp->s, pkt, &_size, 0, dst_addr, dst_addr_len);
 	} else if (transport_id == TRANSPORT_SOCKET_RTCP) {
 		/* Traffic is destined to go right out the RTCP socket we already have */
 		if (rtp->rtcp) {
-			status = pj_sock_sendto(rtp->rtcp->s, pkt, (pj_ssize_t*)&size, 0, dst_addr, dst_addr_len);
+			status = pj_sock_sendto(rtp->rtcp->s, pkt, &_size, 0, dst_addr, dst_addr_len);
 		} else {
 			status = PJ_SUCCESS;
 		}
