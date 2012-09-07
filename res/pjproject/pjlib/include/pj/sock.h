@@ -471,8 +471,10 @@ typedef enum pj_socket_sd_type
  */
 #define PJ_INVALID_SOCKET   (-1)
 
+#ifndef _ASTERISK_H
 /* Must undefine s_addr because of pj_in_addr below */
 #undef s_addr
+#endif
 
 /**
  * This structure describes Internet address.
