@@ -119,6 +119,7 @@ static void score_address(const struct sockaddr_in *sin, struct in_addr *best_ad
 static int get_local_address(struct ast_sockaddr *ourip)
 {
 	int s, res = -1;
+	int best_score = -100;
 #ifdef SOLARIS
 	struct lifreq *ifr = NULL;
 	struct lifnum ifn;
@@ -131,7 +132,6 @@ static int get_local_address(struct ast_sockaddr *ourip)
 	struct ifaddrs *ifap, *ifaphead;
 	int rtnerr;
 	const struct sockaddr_in *sin;
-	int best_score = -100;
 #endif /* BSD_OR_LINUX */
 	struct in_addr best_addr;
 	memset(&best_addr, 0, sizeof(best_addr));
