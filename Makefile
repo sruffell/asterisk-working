@@ -934,6 +934,9 @@ menuselect-tree: $(foreach dir,$(filter-out main,$(MOD_SUBDIRS)),$(wildcard $(di
 	@cat sounds/sounds.xml >> $@
 	@echo "</menu>" >> $@
 
+tags cscope: FORCE
+	@${SHELL} build_tools/tags.sh $@
+
 .PHONY: menuselect
 .PHONY: main
 .PHONY: sounds
