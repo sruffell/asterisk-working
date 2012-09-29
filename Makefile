@@ -980,6 +980,9 @@ else
 		rest-api/resources.json .
 endif
 
+tags cscope: FORCE
+	@${SHELL} build_tools/tags.sh $@
+
 .PHONY: menuselect
 .PHONY: main
 .PHONY: sounds
