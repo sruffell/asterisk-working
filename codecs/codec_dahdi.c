@@ -3,7 +3,7 @@
  *
  * DAHDI native transcoding support
  *
- * Copyright (C) 1999 - 2008, Digium, Inc.
+ * Copyright (C) 1999 - 2014, Digium, Inc.
  *
  * Mark Spencer <markster@digium.com>
  * Kevin P. Fleming <kpfleming@digium.com>
@@ -35,6 +35,7 @@
 
 ASTERISK_FILE_VERSION(__FILE__, "$Revision$")
 
+#include <stdbool.h>
 #include <fcntl.h>
 #include <netinet/in.h>
 #include <sys/ioctl.h>
@@ -78,10 +79,65 @@ static struct channel_usage {
 	int decoders;
 } channels;
 
+static bool codec_dahdi_synchronous = true;
+
+static char *handle_cli_transcoder_set_synchronous(struct ast_cli_entry *e, int cmd, struct ast_cli_args *a)
+{
+	switch (cmd) {
+	case CLI_INIT:
+		e->command = "transcoder set synchronous";
+		e->usage = "Usage: transcoder set synchronous [on|off]\n"
+			"       When on, codec_dahdi will function synchronously and wait for each frame.\n"
+			"       When off, silence frames will be returned if the hardware\n"
+			"       is not yet ready to return a valid frame.\n";
+		return NULL;
+	case CLI_GENERATE:
+		return NULL;
+	}
+
+	if (a->argc < 4) {
+		return CLI_SHOWUSAGE;
+	}
+
+	if (!strcasecmp(a->argv[3], "on")) {
+		codec_dahdi_synchronous = true;
+		ast_cli(a->fd, "Transcoder synchronous mode is enabled.\n");
+	} else if (!strcasecmp(a->argv[3], "off")) {
+		codec_dahdi_synchronous = false;
+		ast_cli(a->fd, "Transcoder synchronous mode is disabled.\n");
+	} else {
+		ast_cli(a->fd, "Transcoder synchronous mode '%s' is unknown.\n", a->argv[3]);
+		return CLI_FAILURE;
+	}
+	return CLI_SUCCESS;
+}
+
+static char *handle_cli_transcoder_show_synchronous(struct ast_cli_entry *e, int cmd, struct ast_cli_args *a)
+{
+	switch (cmd) {
+	case CLI_INIT:
+		e->command = "transcoder show synchronous";
+		e->usage = "Usage: transcoder show synchronous\n"
+			"       Shows whether transcoder synchronous mode is enabled or disabled.\n";
+		return NULL;
+	case CLI_GENERATE:
+		return NULL;
+	}
+
+	if (a->argc < 3) {
+		return CLI_SHOWUSAGE;
+	}
+
+	ast_cli(a->fd, "Transcoder synchronous mode is %s.\n", ((codec_dahdi_synchronous) ? "enabled" : "disabled"));
+	return CLI_SUCCESS;
+}
+
 static char *handle_cli_transcoder_show(struct ast_cli_entry *e, int cmd, struct ast_cli_args *a);
 
 static struct ast_cli_entry cli[] = {
-	AST_CLI_DEFINE(handle_cli_transcoder_show, "Display DAHDI transcoder utilization.")
+	AST_CLI_DEFINE(handle_cli_transcoder_show, "Display DAHDI transcoder utilization."),
+	AST_CLI_DEFINE(handle_cli_transcoder_show_synchronous, "Show current synchronous mode in codec_dahdi."),
+	AST_CLI_DEFINE(handle_cli_transcoder_set_synchronous, "Enable / Disable synchronous mode in codec_dahdi.")
 };
 
 struct format_map {
@@ -102,10 +158,12 @@ struct codec_dahdi_pvt {
 	struct dahdi_transcoder_formats fmts;
 	unsigned int softslin:1;
 	unsigned int fake:2;
+	unsigned int synchronous:1;
 	uint16_t required_samples;
 	uint16_t samples_in_buffer;
 	uint16_t samples_written_to_hardware;
 	uint8_t ulaw_buffer[1024];
+	unsigned int silent_frames_generated;
 };
 
 /* Only used by a decoder */
@@ -239,6 +297,27 @@ static void dahdi_wait_for_packet(int fd)
 	poll(&p, 1, 10);
 }
 
+static struct ast_frame *dahdi_get_silent_frame(const struct ast_trans_pvt *pvt, unsigned int samples)
+{
+	struct codec_dahdi_pvt *dahdip = pvt->pvt;
+	unsigned char data[160] = {0,};
+	struct ast_frame silent_frame = {
+		.frametype = AST_FRAME_VOICE,
+		.samples = samples,
+		.data.ptr = data,
+		.offset  = 0,
+		.mallocd = 0,
+		.src = __PRETTY_FUNCTION__
+	};
+
+	ast_format_copy(&silent_frame.subclass.format, &pvt->t->dst_format);
+	silent_frame.datalen = ast_codec_get_len(&silent_frame.subclass.format, samples);
+
+	dahdip->silent_frames_generated++;
+
+	return ast_frisolate(&silent_frame);
+}
+
 static struct ast_frame *dahdi_encoder_frameout(struct ast_trans_pvt *pvt)
 {
 	struct codec_dahdi_pvt *dahdip = pvt->pvt;
@@ -262,7 +341,7 @@ static struct ast_frame *dahdi_encoder_frameout(struct ast_trans_pvt *pvt)
 		return NULL;
 	}
 
-	if (dahdip->samples_written_to_hardware >= dahdip->required_samples) {
+	if (dahdip->synchronous && dahdip->samples_written_to_hardware >= dahdip->required_samples) {
 		dahdi_wait_for_packet(dahdip->fd);
 	}
 
@@ -270,7 +349,11 @@ static struct ast_frame *dahdi_encoder_frameout(struct ast_trans_pvt *pvt)
 	if (-1 == res) {
 		if (EWOULDBLOCK == errno) {
 			/* Nothing waiting... */
-			return NULL;
+			if (dahdip->synchronous) {
+				return NULL;
+			}
+			return dahdi_get_silent_frame(pvt, dahdip->required_samples);
+
 		} else {
 			ast_log(LOG_ERROR, "Failed to read from transcoder: %s\n", strerror(errno));
 			return NULL;
@@ -343,7 +426,7 @@ static struct ast_frame *dahdi_decoder_frameout(struct ast_trans_pvt *pvt)
 		return NULL;
 	}
 
-	if (dahdip->samples_written_to_hardware >= ULAW_SAMPLES) {
+	if (dahdip->synchronous && dahdip->samples_written_to_hardware >= ULAW_SAMPLES) {
 		dahdi_wait_for_packet(dahdip->fd);
 	}
 
@@ -356,8 +439,13 @@ static struct ast_frame *dahdi_decoder_frameout(struct ast_trans_pvt *pvt)
 
 	if (-1 == res) {
 		if (EWOULDBLOCK == errno) {
-			/* Nothing waiting... */
-			return NULL;
+			if (dahdip->synchronous) {
+				/* Nothing waiting... */
+				return NULL;
+			}
+
+			return dahdi_get_silent_frame(pvt, ULAW_SAMPLES);
+
 		} else {
 			ast_log(LOG_ERROR, "Failed to read from transcoder: %s\n", strerror(errno));
 			return NULL;
@@ -404,6 +492,7 @@ static void dahdi_destroy(struct ast_trans_pvt *pvt)
 		break;
 	}
 
+	ast_verb(3, "Silent frames generated internally: %u.\n", dahdip->silent_frames_generated);
 	close(dahdip->fd);
 }
 
@@ -421,6 +510,7 @@ static int dahdi_translate(struct ast_trans_pvt *pvt, struct ast_format *dst_for
 		return -1;
 	}
 
+	dahdip->synchronous = (codec_dahdi_synchronous) ? 1 : 0;
 	dahdip->fmts.srcfmt = ast_format_to_old_bitfield(src_format);
 	dahdip->fmts.dstfmt = ast_format_to_old_bitfield(dst_format);
 
@@ -462,6 +552,7 @@ retry:
 	}
 
 	dahdip->fd = fd;
+	dahdip->silent_frames_generated = 0;
 
 	dahdip->required_samples = ((dahdip->fmts.dstfmt|dahdip->fmts.srcfmt) & (ast_format_id_to_old_bitfield(AST_FORMAT_G723_1))) ? G723_SAMPLES : G729_SAMPLES;
 
@@ -663,8 +754,29 @@ static int find_transcoders(void)
 	return 0;
 }
 
+static int parse_config(int reload) 
+{
+	struct ast_flags config_flags = { reload ? CONFIG_FLAG_FILEUNCHANGED : 0 };
+	struct ast_config *cfg = ast_config_load("codecs.conf", config_flags);
+	struct ast_variable *var;
+
+	if (cfg == CONFIG_STATUS_FILEMISSING || cfg == CONFIG_STATUS_FILEUNCHANGED || cfg == CONFIG_STATUS_FILEINVALID)
+		return 0;
+
+	for (var = ast_variable_browse(cfg, "dahdi"); var; var = var->next) {
+		if (!strcasecmp(var->name, "synchronous")) {
+			codec_dahdi_synchronous = ast_true(var->value) ? true : false;
+		} else {
+			ast_verb(3, "codec_dahdi: '%s' is an unknown option.\n", var->name);
+		}
+	}
+	ast_config_destroy(cfg);
+	return 0;
+}
+
 static int reload(void)
 {
+	parse_config(1);
 	return AST_MODULE_LOAD_SUCCESS;
 }
 
@@ -678,9 +790,11 @@ static int unload_module(void)
 
 static int load_module(void)
 {
+	parse_config(0);
 	ast_ulaw_init();
 	find_transcoders();
 	ast_cli_register_multiple(cli, ARRAY_LEN(cli));
+	ast_verb(3, "codec_dahdi: synchronous mode is %s.\n", ((codec_dahdi_synchronous) ? "enabled" : "disabled"));
 	return AST_MODULE_LOAD_SUCCESS;
 }
 
