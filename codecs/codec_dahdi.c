@@ -87,9 +87,7 @@ static char *handle_cli_transcoder_set_synchronous(struct ast_cli_entry *e, int 
 	case CLI_INIT:
 		e->command = "transcoder set synchronous";
 		e->usage = "Usage: transcoder set synchronous [on|off]\n"
-			"       When on, codec_dahdi will function synchronously and wait for each frame.\n"
-			"       When off, silence frames will be returned if the hardware\n"
-			"       is not yet ready to return a valid frame.\n";
+			"       When on, codec_dahdi will function synchronously and wait for each frame.\n";
 		return NULL;
 	case CLI_GENERATE:
 		return NULL;
@@ -163,7 +161,6 @@ struct codec_dahdi_pvt {
 	uint16_t samples_in_buffer;
 	uint16_t samples_written_to_hardware;
 	uint8_t ulaw_buffer[1024];
-	unsigned int silent_frames_generated;
 };
 
 /* Only used by a decoder */
@@ -297,27 +294,6 @@ static void dahdi_wait_for_packet(int fd)
 	poll(&p, 1, 10);
 }
 
-static struct ast_frame *dahdi_get_silent_frame(const struct ast_trans_pvt *pvt, unsigned int samples)
-{
-	struct codec_dahdi_pvt *dahdip = pvt->pvt;
-	unsigned char data[160] = {0,};
-	struct ast_frame silent_frame = {
-		.frametype = AST_FRAME_VOICE,
-		.samples = samples,
-		.data.ptr = data,
-		.offset  = 0,
-		.mallocd = 0,
-		.src = __PRETTY_FUNCTION__
-	};
-
-	ast_format_copy(&silent_frame.subclass.format, &pvt->t->dst_format);
-	silent_frame.datalen = ast_codec_get_len(&silent_frame.subclass.format, samples);
-
-	dahdip->silent_frames_generated++;
-
-	return ast_frisolate(&silent_frame);
-}
-
 static struct ast_frame *dahdi_encoder_frameout(struct ast_trans_pvt *pvt)
 {
 	struct codec_dahdi_pvt *dahdip = pvt->pvt;
@@ -347,17 +323,10 @@ static struct ast_frame *dahdi_encoder_frameout(struct ast_trans_pvt *pvt)
 
 	res = read(dahdip->fd, pvt->outbuf.c + pvt->datalen, pvt->t->buf_size - pvt->datalen);
 	if (-1 == res) {
-		if (EWOULDBLOCK == errno) {
-			/* Nothing waiting... */
-			if (dahdip->synchronous) {
-				return NULL;
-			}
-			return dahdi_get_silent_frame(pvt, dahdip->required_samples);
-
-		} else {
+		if (EWOULDBLOCK != errno) {
 			ast_log(LOG_ERROR, "Failed to read from transcoder: %s\n", strerror(errno));
-			return NULL;
 		}
+		return NULL;
 	} else {
 		pvt->f.datalen = res;
 		pvt->f.frametype = AST_FRAME_VOICE;
@@ -438,18 +407,10 @@ static struct ast_frame *dahdi_decoder_frameout(struct ast_trans_pvt *pvt)
 	}
 
 	if (-1 == res) {
-		if (EWOULDBLOCK == errno) {
-			if (dahdip->synchronous) {
-				/* Nothing waiting... */
-				return NULL;
-			}
-
-			return dahdi_get_silent_frame(pvt, ULAW_SAMPLES);
-
-		} else {
+		if (EWOULDBLOCK != errno) {
 			ast_log(LOG_ERROR, "Failed to read from transcoder: %s\n", strerror(errno));
-			return NULL;
 		}
+		return NULL;
 	} else {
 		if (dahdip->softslin) {
 			ulawtolin(pvt, res);
@@ -491,8 +452,6 @@ static void dahdi_destroy(struct ast_trans_pvt *pvt)
 		ast_atomic_fetchadd_int(&channels.decoders, -1);
 		break;
 	}
-
-	ast_verb(3, "Silent frames generated internally: %u.\n", dahdip->silent_frames_generated);
 	close(dahdip->fd);
 }
 
@@ -552,7 +511,6 @@ retry:
 	}
 
 	dahdip->fd = fd;
-	dahdip->silent_frames_generated = 0;
 
 	dahdip->required_samples = ((dahdip->fmts.dstfmt|dahdip->fmts.srcfmt) & (ast_format_id_to_old_bitfield(AST_FORMAT_G723_1))) ? G723_SAMPLES : G729_SAMPLES;
 
