@@ -291,7 +291,7 @@ static void dahdi_wait_for_packet(int fd)
 	struct pollfd p = {0};
 	p.fd = fd;
 	p.events = POLLIN;
-	poll(&p, 1, 10);
+	poll(&p, 1, 5);
 }
 
 static struct ast_frame *dahdi_encoder_frameout(struct ast_trans_pvt *pvt)
