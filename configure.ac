@@ -418,6 +418,7 @@ AST_EXT_LIB_SETUP([LIBXSLT], [LibXSLT], [libxslt])
 AST_EXT_LIB_SETUP_OPTIONAL([LIBXSLT_CLEANUP], [LibXSLT Library Cleanup Function], [LIBXSLT], [libxslt])
 AST_EXT_LIB_SETUP([LTDL], [libtool], [ltdl])
 AST_EXT_LIB_SETUP([LUA], [Lua], [lua])
+AST_EXT_LIB_SETUP([LTTNG_UST], [Linux Trace Toolkit Next Generation - User Space Tracing], [lttng_ust])
 AST_EXT_LIB_SETUP([MISDN], [mISDN user], [misdn])
 AST_EXT_LIB_SETUP([MYSQLCLIENT], [MySQL client], [mysqlclient])
 AST_EXT_LIB_SETUP([NBS], [Network Broadcast Sound], [nbs])
@@ -2157,6 +2158,9 @@ fi
 
 # Some distributions (like SuSE) remove the 5.1 suffix.
 AST_EXT_LIB_CHECK([LUA], [lua], [luaL_openlib], [lua.h], [-lm])
+
+
+AST_EXT_LIB_CHECK([LTTNG_UST], [lttng-ust], [ust_loglevel], [lttng/tracepoint.h], [-ldl])
 
 # Accept either RADIUS client library, their APIs are fully compatible,
 # just different header filenames and different SONAMEs

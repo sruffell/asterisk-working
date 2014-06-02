@@ -27,4 +27,9 @@
 		<member name="TEST_FRAMEWORK" displayname="Enable Test Framework API">
 			<support_level>extended</support_level>
 		</member>
+		<member name="TRACING" displayname="Enable LTTNG Tracepoints">
+			<depend>LTTNG_UST</depend>
+			<defaultenabled>no</defaultenabled>
+			<support_level>extended</support_level>
+		</member>
 	</category>

@@ -40,6 +40,7 @@ AST_LIBS+=$(JANSSON_LIB)
 AST_LIBS+=$(URIPARSER_LIB)
 AST_LIBS+=$(UUID_LIB)
 AST_LIBS+=$(CRYPT_LIB)
+AST_LIBS+=$(LTTNG_UST_LIB)
 
 ifneq ($(findstring $(OSARCH), linux-gnu uclinux linux-uclibc kfreebsd-gnu),)
   ifneq ($(findstring LOADABLE_MODULES,$(MENUSELECT_CFLAGS)),)
@@ -159,6 +160,7 @@ json.o: _ASTCFLAGS+=$(JANSSON_INCLUDE)
 bucket.o: _ASTCFLAGS+=$(URIPARSER_INCLUDE)
 crypt.o: _ASTCFLAGS+=$(CRYPT_INCLUDE)
 uuid.o: _ASTCFLAGS+=$(UUID_INCLUDE)
+org_asterisk_core_provider.o: _ASTCFLAGS+=-I.
 
 ifneq ($(findstring ENABLE_UPLOADS,$(MENUSELECT_CFLAGS)),)
 http.o: _ASTCFLAGS+=$(GMIME_INCLUDE)

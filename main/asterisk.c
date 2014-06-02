@@ -251,6 +251,9 @@ int daemon(int, int);  /* defined in libresolv of all places */
 
 #include "../defaults.h"
 
+#define TRACEPOINT_DEFINE
+#include "org_asterisk_core_provider.h"
+
 /*** DOCUMENTATION
 	<managerEvent language="en_US" name="FullyBooted">
 		<managerEventInstance class="EVENT_FLAG_SYSTEM">
@@ -3797,6 +3800,8 @@ int main(int argc, char *argv[])
 	char *remotesock = NULL;
 	int moduleresult;         /*!< Result from the module load subsystem */
 	struct rlimit l;
+
+	tracepoint(org_asterisk_core, start);
 
 	/* Remember original args for restart */
 	if (argc > ARRAY_LEN(_argv) - 1) {
