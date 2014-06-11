@@ -70,6 +70,8 @@ ASTERISK_FILE_VERSION(__FILE__, "$Revision$")
 #include "asterisk/ast_version.h"
 #include "asterisk/backtrace.h"
 
+#include "org_asterisk_core_provider.h"
+
 /*** DOCUMENTATION
  ***/
 
@@ -627,6 +629,7 @@ void ast_queue_log(const char *queuename, const char *callid, const char *agent,
 		va_start(ap, fmt);
 		qlog_len = snprintf(qlog_msg, sizeof(qlog_msg), "%ld|%s|%s|%s|%s|", (long)time(NULL), callid, queuename, agent, event);
 		vsnprintf(qlog_msg + qlog_len, sizeof(qlog_msg) - qlog_len, fmt, ap);
+
 		va_end(ap);
 		AST_RWLIST_RDLOCK(&logchannels);
 		if (qlog) {
@@ -1193,6 +1196,9 @@ static void logger_print_normal(struct logmsg *logmsg)
 	}
 
 	AST_RWLIST_RDLOCK(&logchannels);
+
+	tracepoint(org_asterisk_core, logger_print_normal, (const char *)logmsg->file,
+		logmsg->line, (const char *)logmsg->function, (const char *)logmsg->message);
 
 	if (!AST_RWLIST_EMPTY(&logchannels)) {
 		AST_RWLIST_TRAVERSE(&logchannels, chan, list) {

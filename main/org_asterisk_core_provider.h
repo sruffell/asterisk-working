@@ -77,6 +77,20 @@ TRACEPOINT_EVENT(
 )
 TRACEPOINT_LOGLEVEL(org_asterisk_core, message, TRACE_INFO)
 
+TRACEPOINT_EVENT(
+	org_asterisk_core,
+	logger_print_normal,
+	TP_ARGS(const char *, file, int, line,
+		const char *, function, const char *, message ),
+	TP_FIELDS(
+		ctf_string(file, file)
+		ctf_integer(int, line, line)
+		ctf_string(function, function)
+		ctf_string(message, message)
+	)
+)
+TRACEPOINT_LOGLEVEL(org_asterisk_core, logger_print_normal, TRACE_DEBUG)
+
 #endif /* _TRACEPOINT_UST_ASTERISK_H */
 
 #include <lttng/tracepoint-event.h>
