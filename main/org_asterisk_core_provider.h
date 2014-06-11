@@ -91,6 +91,50 @@ TRACEPOINT_EVENT(
 )
 TRACEPOINT_LOGLEVEL(org_asterisk_core, logger_print_normal, TRACE_DEBUG)
 
+TRACEPOINT_EVENT(
+	org_asterisk_core,
+	channel_register,
+	TP_ARGS(const char *, type, const char *, description),
+	TP_FIELDS(
+		ctf_string(type, type)
+		ctf_string(description, description)
+	)
+)
+TRACEPOINT_LOGLEVEL(org_asterisk_core, channel_register, TRACE_INFO)
+
+TRACEPOINT_EVENT(
+	org_asterisk_core,
+	channel_unregister,
+	TP_ARGS(const char *, type, const char *, description),
+	TP_FIELDS(
+		ctf_string(type, type)
+		ctf_string(description, description)
+	)
+)
+TRACEPOINT_LOGLEVEL(org_asterisk_core, channel_unregister, TRACE_INFO)
+
+TRACEPOINT_EVENT(
+	org_asterisk_core,
+	channel_create,
+	TP_ARGS(const char *, file, int, line, const char *, function, const char *, channel_name),
+	TP_FIELDS(
+		ctf_string(file, file)
+		ctf_integer(int, line, line)
+		ctf_string(function, function)
+		ctf_string(channel_name, channel_name)
+	)
+)
+TRACEPOINT_LOGLEVEL(org_asterisk_core, channel_create, TRACE_INFO)
+
+TRACEPOINT_EVENT(
+	org_asterisk_core,
+	channel_destroy,
+	TP_ARGS(const char *, channel_name),
+	TP_FIELDS(
+		ctf_string(channel_name, channel_name)
+	)
+)
+TRACEPOINT_LOGLEVEL(org_asterisk_core, channel_destroy, TRACE_INFO)
 #endif /* _TRACEPOINT_UST_ASTERISK_H */
 
 #include <lttng/tracepoint-event.h>

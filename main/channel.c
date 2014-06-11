@@ -76,6 +76,8 @@ ASTERISK_FILE_VERSION(__FILE__, "$Revision$")
 #include "asterisk/test.h"
 #include "asterisk/stasis_channels.h"
 
+#include "org_asterisk_core_provider.h"
+
 /*** DOCUMENTATION
  ***/
 
@@ -582,6 +584,8 @@ int ast_channel_register(const struct ast_channel_tech *tech)
 {
 	struct chanlist *chan;
 
+	tracepoint(org_asterisk_core, channel_register, tech->type, tech->description);
+
 	AST_RWLIST_WRLOCK(&backends);
 
 	AST_RWLIST_TRAVERSE(&backends, chan, list) {
@@ -613,6 +617,8 @@ void ast_channel_unregister(const struct ast_channel_tech *tech)
 {
 	struct chanlist *chan;
 
+	tracepoint(org_asterisk_core, channel_unregister, tech->type, tech->description);
+
 	ast_debug(1, "Unregistering channel type '%s'\n", tech->type);
 
 	AST_RWLIST_WRLOCK(&backends);
@@ -628,6 +634,7 @@ void ast_channel_unregister(const struct ast_channel_tech *tech)
 	AST_LIST_TRAVERSE_SAFE_END;
 
 	AST_RWLIST_UNLOCK(&backends);
+
 }
 
 /*! \brief Get handle to channel driver based on name */
@@ -1033,6 +1040,8 @@ __ast_channel_alloc_ap(int needqueue, int state, const char *cid_num, const char
 	 * the world know of its existance
 	 */
 	ast_channel_stage_snapshot_done(tmp);
+	tracepoint(org_asterisk_core, channel_create, file, line, function, ast_channel_name(tmp));
+
 	return tmp;
 }
 
@@ -2248,6 +2257,8 @@ static void ast_channel_destructor(void *obj)
 	char device_name[AST_CHANNEL_NAME];
 	struct ast_callid *callid;
 
+	tracepoint(org_asterisk_core, channel_destroy, ast_channel_name(chan));
+
 	/* Stop monitoring */
 	if (ast_channel_monitor(chan)) {
 		ast_channel_monitor(chan)->stop(chan, 0);
@@ -2384,6 +2395,7 @@ static void ast_channel_destructor(void *obj)
 	ast_channel_named_pickupgroups_set(chan, NULL);
 
 	ast_atomic_fetchadd_int(&chancount, -1);
+
 }
 
 /*! \brief Free a dummy channel structure */
