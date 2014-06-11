@@ -20,6 +20,10 @@
  * \brief Asterisk Linux Trace Toolkit Tracepoint providers
  */
 
+#include "asterisk/autoconfig.h"
+
+#ifdef HAVE_LTTNG_UST
+
 #undef TRACEPOINT_PROVIDER
 #define TRACEPOINT_PROVIDER org_asterisk_core
 
@@ -138,3 +142,9 @@ TRACEPOINT_LOGLEVEL(org_asterisk_core, channel_destroy, TRACE_INFO)
 #endif /* _TRACEPOINT_UST_ASTERISK_H */
 
 #include <lttng/tracepoint-event.h>
+
+#else
+
+#define tracepoint(...) do { } while(0)
+
+#endif
