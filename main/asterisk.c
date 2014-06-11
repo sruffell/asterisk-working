@@ -3801,7 +3801,7 @@ int main(int argc, char *argv[])
 	int moduleresult;         /*!< Result from the module load subsystem */
 	struct rlimit l;
 
-	tracepoint(org_asterisk_core, start);
+	tracepoint(org_asterisk_core, start, ast_get_version());
 
 	/* Remember original args for restart */
 	if (argc > ARRAY_LEN(_argv) - 1) {
@@ -4200,6 +4200,7 @@ int main(int argc, char *argv[])
 #else
 		fprintf(stderr, "Mac OS X detected.  Use 'launchctl load /Library/LaunchDaemon/org.asterisk.asterisk.plist'.\n");
 #endif
+		tracepoint(org_asterisk_core, forked);
 	}
 #endif
 

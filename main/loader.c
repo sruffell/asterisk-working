@@ -63,6 +63,8 @@ ASTERISK_FILE_VERSION(__FILE__, "$Revision$")
 #include "asterisk/md5.h"
 #include "asterisk/utils.h"
 
+#include "org_asterisk_core_provider.h"
+
 /*** DOCUMENTATION
 	<managerEvent language="en_US" name="Reload">
 		<managerEventInstance class="EVENT_FLAG_SYSTEM">
@@ -972,7 +974,10 @@ static enum ast_module_load_result start_resource(struct ast_module *mod)
 	if (!ast_fully_booted) {
 		ast_verb(1, "Loading %s.\n", mod->resource);
 	}
+
+	tracepoint(org_asterisk_core, dynamic_loader_loadstart, mod->resource);
 	res = mod->info->load();
+	tracepoint(org_asterisk_core, dynamic_loader_loadcomplete, mod->resource, res);
 
 	switch (res) {
 	case AST_MODULE_LOAD_SUCCESS:
@@ -1318,6 +1323,8 @@ int load_modules(unsigned int preload_only)
 	load_count = 0;
 	AST_LIST_TRAVERSE(&load_order, order, entry)
 		load_count++;
+
+	tracepoint(org_asterisk_core, dynamic_loader_start, load_count);
 
 	if (load_count)
 		ast_log(LOG_NOTICE, "%u modules will be loaded.\n", load_count);

@@ -31,8 +31,41 @@
 
 #include <lttng/tracepoint.h>
 
-TRACEPOINT_EVENT(org_asterisk_core, start, TP_ARGS(), TP_FIELDS())
+TRACEPOINT_EVENT(org_asterisk_core, start,
+	TP_ARGS(const char *, version), 
+	TP_FIELDS(
+		ctf_string(version, version)
+	)
+)
 TRACEPOINT_LOGLEVEL(org_asterisk_core, start, TRACE_INFO)
+
+TRACEPOINT_EVENT(org_asterisk_core, dynamic_loader_start,
+	TP_ARGS(int, load_count),
+	TP_FIELDS(
+		ctf_integer(int, module_to_load, load_count)
+	)
+)
+TRACEPOINT_LOGLEVEL(org_asterisk_core, dynamic_loader_start, TRACE_INFO)
+
+TRACEPOINT_EVENT(org_asterisk_core, dynamic_loader_loadstart,
+	TP_ARGS(const char *, text),
+	TP_FIELDS(
+		ctf_string(module_name, text)
+	)
+)
+TRACEPOINT_LOGLEVEL(org_asterisk_core, dynamic_loader_loadstart, TRACE_INFO)
+
+TRACEPOINT_EVENT(org_asterisk_core, dynamic_loader_loadcomplete,
+	TP_ARGS(const char *, text, int, result_int),
+	TP_FIELDS(
+		ctf_string(module_name, text)
+		ctf_integer(int, result, result_int)
+	)
+)
+TRACEPOINT_LOGLEVEL(org_asterisk_core, dynamic_loader_loadcomplete, TRACE_INFO)
+
+TRACEPOINT_EVENT(org_asterisk_core, forked, TP_ARGS(), TP_FIELDS())
+TRACEPOINT_LOGLEVEL(org_asterisk_core, daemon, TRACE_INFO)
 
 TRACEPOINT_EVENT(
 	org_asterisk_core,
