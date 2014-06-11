@@ -69,7 +69,7 @@ TRACEPOINT_EVENT(org_asterisk_core, dynamic_loader_loadcomplete,
 TRACEPOINT_LOGLEVEL(org_asterisk_core, dynamic_loader_loadcomplete, TRACE_INFO)
 
 TRACEPOINT_EVENT(org_asterisk_core, forked, TP_ARGS(), TP_FIELDS())
-TRACEPOINT_LOGLEVEL(org_asterisk_core, daemon, TRACE_INFO)
+TRACEPOINT_LOGLEVEL(org_asterisk_core, forked, TRACE_INFO)
 
 TRACEPOINT_EVENT(
 	org_asterisk_core,
