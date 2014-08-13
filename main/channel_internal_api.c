@@ -487,8 +487,12 @@ DEFINE_STRINGFIELD_GETTER_FOR(dialcontext);
 
 const char *ast_channel_uniqueid(const struct ast_channel *chan)
 {
-	ast_assert(chan->uniqueid.unique_id[0] != '\0');
-	return chan->uniqueid.unique_id;
+	if (chan) {
+		ast_assert(chan->uniqueid.unique_id[0] != '\0');
+		return chan->uniqueid.unique_id;
+	} else {
+		return "NULLCHANNEL";
+	}
 }
 
 const char *ast_channel_linkedid(const struct ast_channel *chan)
